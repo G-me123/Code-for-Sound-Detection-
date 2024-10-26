@@ -1,0 +1,54 @@
+import pyaudio
+import numpy as np
+import librosa
+from scipy.spatial.distance import euclidean
+
+# Audio configuration
+RATE = 16000  # Sampling rate
+CHUNK = 1024  # Size of each audio chunk
+
+# Load the reference audio sample of rice weevils
+reference_audio_path = "weevil_sound.wav"
+reference_audio, _ = librosa.load(reference_audio_path, sr=RATE)
+
+# Set up PyAudio
+audio = pyaudio.PyAudio()
+
+# Open a stream
+stream = audio.open(format=pyaudio.paInt16, channels=1,
+                    rate=RATE, input=True,
+                    frames_per_buffer=CHUNK)
+
+# Function to detect rice weevil sound pattern
+def detect_weevil_sound(data):
+    # Convert byte data to numpy array
+    audio_data = np.frombuffer(data, dtype=np.int16)
+
+    # Resample and normalize incoming audio
+    incoming_audio = librosa.util.normalize(audio_data.astype(float))
+
+    # Calculate the similarity between the incoming audio and reference
+    distance = euclidean(librosa.feature.rms(y=incoming_audio).mean(), 
+                         librosa.feature.rms(y=reference_audio).mean())
+
+    # If the distance is small, we assume a match (threshold might need to be adjusted)
+    if distance < 0.1:  # Adjust this threshold based on testing
+        print("Weevil sound detected")
+
+try:
+    print("Listening for weevil sounds...")
+    while True:
+        # Read audio data from the microphone
+        data = stream.read(CHUNK, exception_on_overflow=False)
+        
+        # Detect sound
+        detect_weevil_sound(data)
+
+except KeyboardInterrupt:
+    print("Exiting...")
+
+finally:
+    # Close the stream and terminate PyAudio
+    stream.stop_stream()
+    stream.close()
+    audio.terminate()
